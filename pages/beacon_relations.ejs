@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<%- include partials/head.ejs %>
+    <%- include partials/aws.ejs %>
+
+        <body>
+            <div id="wrapper">
+                <%- include partials/header.ejs %>
+                    <div id="page-wrapper">
+                        <div class="container-fluid">
+                            <div class="row">
+                                <div class="col-lg-12">
+                                    <h1 class="page-header">Beacon Relations</h1>
+                                </div>
+                                <div>
+                                    <button class="btn btn-primary addBtn" id="addButton">Add</button>
+                                    <table id="beaconRelTable" class="table table-striped table-bordered"></table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </body>
+
+</html>
+
+<script>
+    var apigClient = apigClientFactory.newClient();
+    var contentHTML = '<form id="beaconRelForm"><h4>Beacon ID</h4><select id="inputRelBeaconID"></select><h4>Related Beacon</h4><select id="inputRelRelatedBeacons" multiple="multiple" required></select></form>';
+    var existingBeaconIDs = [];
+
+    loadBeaconRelTable();
+
+    async function loadBeaconRelTable() {
+        showAjaxLoading();
+        var beaconRelData = await getBeaconRelData();
+        $('#beaconRelTable').DataTable({
+            data: beaconRelData,
+            columns: [
+                { data: 'BeaconID', title: 'Beacon ID' },
+                { data: 'RelatedBeacon', title: 'Related Beacons' },
+                {
+                    data: 'BeaconID', render: function (data, type, row) {
+                        return '<button class="updateButton btn btn-primary" data-id="' + data + '">Update</button>';
+                    }, title: 'Action'
+                },
+            ]
+        });
+        hideAjaxLoading();
+    }
+
+    function getBeaconRelData() {
+        return new Promise(resolve => {
+            apigClient.typePost({ action: 'getBeaconRelation', type: 'BeaconRelation' }, body, additionalParams)
+                .then(function (result) {
+                    var formattedData = [];
+                    for (index = 0; index < result.data.length; index++) {
+                        relationRow = result.data[index];
+                        //Is the UNIQUE BeaconID is not found on the relation, create a new record with a relation inside
+                        if (!formattedData.some(data => data['BeaconID'] === relationRow.BeaconID)) {
+                            formattedData.push(relationRow);
+                            existingBeaconIDs.push(relationRow.BeaconID);
+                        }
+                        //if the beaconID already exists, then put the relation to the record
+                        else {
+                            var indexOfFormattedData = formattedData.findIndex(data => data['BeaconID'] === relationRow.BeaconID);
+                            formattedData[indexOfFormattedData].RelatedBeacon += ', ' + result.data[index].RelatedBeacon;
+                        }
+                    }
+
+                    resolve(formattedData);
+                }).catch(function (error) {
+                    showErrorMsg(error);
+                    console.log('Unexpected Error ' + error);
+                });
+        })
+    }
+
+    $('#beaconRelTable').off().on('click', '.updateButton', async function (e) {
+        var clickedBeaconID = $(this).data('id');
+        showAjaxLoading();
+        beaconIDs = await getBeaconIDs();
+
+        $.confirm({
+            columnClass: 'col-md-6 col-md-offset-3',
+            title: 'Update Beacon Relation',
+            content: contentHTML,
+            onContentReady: async function () {
+                for (index = 0; index < beaconIDs.length; index++) {
+                    //don't want beacons that already exists
+                    if (existingBeaconIDs.indexOf(beaconIDs[index]) == -1 || beaconIDs[index] == clickedBeaconID) {
+                        $('#inputRelBeaconID').append('<option value="' + beaconIDs[index] + '">' + beaconIDs[index] + '</option>');
+                    }
+                    //also include duplicate beacons on beacon relation
+                    $('#inputRelRelatedBeacons').append('<option value="' + beaconIDs[index] + '">' + beaconIDs[index] + '</option>');
+
+                }
+
+                apigClient.typePost({ action: 'getBeaconRelationById', type: 'BeaconRelation' }, { BeaconRelation: { BeaconID: clickedBeaconID } }, additionalParams)
+                    .then(function (result) {
+                        //place the relatedBeacons into an array, then put inside the value selector
+                        //beacon ID is also placed here to the selector
+                        var relatedBeacons = [];
+                        for (index = 0; index < result.data.length; index++) {
+                            relatedBeacons.push(result.data[index].RelatedBeacon);
+                        }
+                        $('#inputRelBeaconID').val(clickedBeaconID);
+                        $('#inputRelRelatedBeacons').val(relatedBeacons);
+
+                        //select2 plugin
+                        $('#inputRelRelatedBeacons').select2({
+                            dropdownParent: $('.jconfirm-cell'),
+                            theme: 'bootstrap'
+                        });
+                    });
+
+                hideAjaxLoading();
+            },
+            buttons: {
+                cancel: {
+                    text: 'Cancel',
+                    btnClass: 'btn btn-link',
+                },
+                delete: {
+                    text: 'Delete',
+                    btnClass: 'btn btn-danger',
+                    action: function () {
+                        e = this;
+                        $.confirm({
+                            columnClass: 'col-md-4 col-md-offset-4',
+                            title: 'Delete Confirmation',
+                            content: 'Are you sure you want to delete the Beacon Relation? This cannot be undone.',
+                            buttons: {
+                                cancel: {
+                                    text: 'Cancel',
+                                    btnClass: 'btn btn-link',
+                                },
+                                delete: {
+                                    text: 'Delete',
+                                    btnClass: 'btn btn-danger',
+                                    action: function () {
+                                        e.close();
+
+                                        showAjaxLoading();
+                                        apigClient.typePost({ action: 'deleteBeaconRelation', type: 'BeaconRelation' }, { BeaconRelation: { BeaconID: clickedBeaconID } }, additionalParams)
+                                            .then(function (result) {
+                                                reloadTable();
+                                                showSuccessMsg();
+                                            }).catch(function (error) {
+                                                showErrorMsg(error);
+                                            });
+                                        hideAjaxLoading();
+                                    }
+                                }
+                            }
+                        });
+                        return false;
+
+                    }
+                },
+                save: {
+                    text: 'Save',
+                    btnClass: 'btn btn-success',
+                    action: function () {
+                        if (!$('#beaconRelForm')[0].checkValidity()) {
+                            $('<input type="submit">').hide().appendTo($('#beaconRelForm')).click().remove();
+                            return false;
+                        }
+                        else {
+                            showAjaxLoading();
+                            var newRelBeaconId = parseInt($('#inputRelBeaconID').val());
+                            var relatedBeacons = $('#inputRelRelatedBeacons').val();
+                            apigClient.typePost({ action: 'putBeaconRelation', type: 'BeaconRelation' }, { BeaconRelation: { BeaconID: clickedBeaconID, NewBeaconID: newRelBeaconId, RelatedBeacon: relatedBeacons } }, additionalParams)
+                                .then(function (result) {
+                                    reloadTable();
+                                    showSuccessMsg();
+                                }).catch(function (error) {
+                                    showErrorMsg(error);
+                                });
+                            hideAjaxLoading();
+                        }
+                    }
+                }
+            }
+        })
+    });
+
+    $('#addButton').on('click', function () {
+        showAjaxLoading();
+        $.confirm({
+            columnClass: 'col-md-6 col-md-offset-3',
+            title: 'Add Beacon Relation',
+            content: contentHTML,
+            onContentReady: async function () {
+                beaconIDs = await getBeaconIDs();
+                for (index = 0; index < beaconIDs.length; index++) {
+                    //don't want beacons that already exists
+                    if (existingBeaconIDs.indexOf(beaconIDs[index]) == -1) {
+                        $('#inputRelBeaconID').append('<option value="' + beaconIDs[index] + '">' + beaconIDs[index] + '</option>');
+                    }
+                    $('#inputRelRelatedBeacons').append('<option value="' + beaconIDs[index] + '">' + beaconIDs[index] + '</option>');
+                }
+
+                //select2 plugin
+                $('#inputRelRelatedBeacons').select2({
+                    dropdownParent: $('.jconfirm-cell'),
+                    theme: 'bootstrap'
+                });
+                hideAjaxLoading();
+            },
+            buttons: {
+                cancel: {
+                    text: 'Cancel',
+                    btnClass: 'btn btn-link',
+                },
+                add: {
+                    text: 'Add',
+                    btnClass: 'btn btn-success',
+                    action: function () {
+                        if (!$('#beaconRelForm')[0].checkValidity()) {
+                            $('<input type="submit">').hide().appendTo($('#beaconRelForm')).click().remove();
+                            return false;
+                        }
+                        else {
+                            showAjaxLoading();
+                            var createRelBeaconID = parseInt($('#inputRelBeaconID').val());
+                            var createRelRelatedBeacons = $('#inputRelRelatedBeacons').val();
+
+                            apigClient.typePost({ action: 'createBeaconRelation', type: 'BeaconRelation' }, { BeaconRelation: { BeaconID: createRelBeaconID, RelatedBeacon: createRelRelatedBeacons } }, additionalParams)
+                                .then(function (result) {
+                                    reloadTable();
+                                    showSuccessMsg();
+                                }).catch(function (error) {
+                                    showErrorMsg(error);
+                                });
+                            hideAjaxLoading();
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    async function reloadTable() {
+        var currentPage = $('#beaconRelTable').dataTable().api().page.info().page;
+        var newData = await getBeaconRelData();
+        $('#beaconRelTable').dataTable().api().clear().rows.add(newData).draw();
+        $('#beaconRelTable').dataTable().api().page(currentPage).draw('page');
+    }
+
+    function getBeaconIDs() {
+        return new Promise(resolve => {
+            apigClient.typePost({ action: 'getBeacon', type: 'Beacon' }, body, additionalParams)
+                .then(function (result) {
+                    var beaconIDs = [];
+                    for (index = 0; index < result.data.length; index++) {
+                        beaconIDs.push(result.data[index].BeaconID);
+                    }
+                    resolve(beaconIDs);
+                }).catch(function (error) {
+                    showErrorMsg(error);
+                    console.log('Unexpected Error ' + error);
+                });
+        })
+    }
+</script>

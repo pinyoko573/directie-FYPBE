@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<%- include partials/head.ejs %>
+    <%- include partials/aws.ejs %>
+
+        <body>
+            <div id="wrapper">
+                <%- include partials/header.ejs %>
+
+                    <div id="page-wrapper">
+                        <div class="container-fluid">
+                            <div class="row">
+                                <div class="col-lg-12">
+                                    <h1 class="page-header">Beacons</h1>
+                                </div>
+                                <div>
+                                    <button class="btn btn-primary addBtn" id="addButton">Add</button>
+                                    <table id="beaconTable" class="table table-striped table-bordered"></table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </body>
+
+</html>
+
+<script>
+    var apigClient = apigClientFactory.newClient();
+    var contentHTML = '<form id="beaconForm"><h4>Beacon ID</h4><input type="number" id="inputBeaconID" min="0" required><h4>UUID (8-4-4-4-12 digits)</h4><input type="text" class="inputBeaconUUID" pattern="[0-9]{8}" size="5" required>-<input type="text" class="inputBeaconUUID" pattern="[0-9]{4}" size="1" required>-<input type="text" class="inputBeaconUUID" pattern="[0-9]{4}" size="1" required>-<input type="text" class="inputBeaconUUID" pattern="[0-9]{4}" size="1" required>-<input type="text" class="inputBeaconUUID" pattern="[0-9]{12}" size="10" required><br><span class="majMinBox"><h4>Major</h4><input type="number" id="inputBeaconMajor" min="0" max="9999" required></span><span class="majMinBox"><h4>Minor</h4><input type="number" min="0" max="9999" id="inputBeaconMinor" required></span><br><h4>Turning Point</h4><label class="switch"><input type="checkbox" id="inputTurningPt"><span class="slider"></span></label></form>';
+    var beaconIDs = [];
+
+    loadBeaconTable();
+
+    async function loadBeaconTable() {
+        showAjaxLoading();
+        var beaconData = await getBeaconData();
+        $('#beaconTable').DataTable({
+            data: beaconData,
+            columns: [
+                { data: 'BeaconID', title: 'Beacon ID' },
+                { data: 'UUID', title: 'UUID' },
+                { data: 'Major', title: 'Major' },
+                { data: 'Minor', title: 'Minor' },
+                {
+                    data: 'TurningPoint', render: function (data, type, row) {
+                        if (data)
+                            return "Yes";
+                        else
+                            return "No";
+                    }, title: 'Turning Point'
+                },
+                {
+                    data: null, render: function (data, type, row) {
+                        if (data.Toggle)
+                            return '<label class="switch"><input class="toggleBox" type="checkbox" data-id="' + data.BeaconID + '" checked><span class="slider"></span></label>';
+                        else if (!data.Toggle)
+                            return '<label class="switch"><input class="toggleBox" type="checkbox" data-id="' + data.BeaconID + '"><span class="slider"></span></label>';
+                    }, title: 'Toggle'
+                },
+                {
+                    data: 'BeaconID', render: function (data, type, row) {
+                        return '<button class="updateButton btn btn-primary" data-id="' + data + '">Update</button>';
+                    }, title: 'Action'
+                },
+            ]
+        });
+        hideAjaxLoading();
+
+        //Toggle button
+        $(".toggleBox").change(function (e) {
+            showAjaxLoading();
+            var clickToggleBeaconId = $(this).data('id');
+            apigClient.typePost({ action: 'putToggle', type: 'Beacon' }, { Beacon: { Toggle: this.checked ? 1 : 0, BeaconID: clickToggleBeaconId } }, additionalParams)
+                .then(function (result) {
+                    showSuccessMsg();
+                }).catch(function (error) {
+                    showErrorMsg(error);
+                });
+            hideAjaxLoading();
+        });
+    }
+
+    function getBeaconData() {
+        return new Promise(resolve => {
+            apigClient.typePost({ action: 'getBeacon', type: 'Beacon' }, body, additionalParams)
+                .then(function (result) {
+                    beaconIDs = [];
+                    //pass all beacon IDs
+                    for (index = 0; index < result.data.length; index++) {
+                        beaconIDs.push(result.data[index].BeaconID);
+                    }
+
+                    resolve(result.data);
+                }).catch(function (error) {
+                    showErrorMsg(error);
+                    console.log('Unexpected Error ' + error);
+                });
+        })
+    }
+
+    $('#beaconTable').off().on('click', '.updateButton', function (e) {
+        var clickUpdateBeaconId = $(this).data('id');
+        showAjaxLoading();
+        apigClient.typePost({ action: 'getBeaconById', type: 'Beacon' }, { Beacon: { BeaconID: clickUpdateBeaconId } }, additionalParams)
+            .then(function (result) {
+                //Get values from API
+                clickedBeaconData = result.data[0];
+
+                $.confirm({
+                    columnClass: 'col-md-6 col-md-offset-3',
+                    title: 'Update for Beacon ' + clickUpdateBeaconId,
+                    content: contentHTML,
+                    onContentReady: function () {
+                        $('#inputBeaconID').val(clickUpdateBeaconId);
+                        $('.inputBeaconUUID:eq(0)').val(clickedBeaconData.UUID.substring(0, 8));
+                        $('.inputBeaconUUID:eq(1)').val(clickedBeaconData.UUID.substring(9, 13));
+                        $('.inputBeaconUUID:eq(2)').val(clickedBeaconData.UUID.substring(14, 18));
+                        $('.inputBeaconUUID:eq(3)').val(clickedBeaconData.UUID.substring(19, 23));
+                        $('.inputBeaconUUID:eq(4)').val(clickedBeaconData.UUID.substring(24, 36));
+                        $('#inputBeaconMajor').val(clickedBeaconData.Major);
+                        $('#inputBeaconMinor').val(clickedBeaconData.Minor);
+                        if (clickedBeaconData.TurningPoint) {
+                            $('#inputTurningPt').prop('checked', true);
+                        }
+                        hideAjaxLoading();
+                    },
+                    buttons: {
+                        cancel: {
+                            text: 'Cancel',
+                            btnClass: 'btn btn-link',
+                        },
+                        delete: {
+                            text: 'Delete',
+                            btnClass: 'btn btn-danger',
+                            action: function () {
+                                e = this;
+                                $.confirm({
+                                    columnClass: 'col-md-4 col-md-offset-4',
+                                    title: 'Delete Confirmation',
+                                    content: 'Are you sure you want to delete the Beacon? This cannot be undone.',
+                                    buttons: {
+                                        cancel: {
+                                            text: 'Cancel',
+                                            btnClass: 'btn btn-link',
+                                        },
+                                        delete: {
+                                            text: 'Delete',
+                                            btnClass: 'btn btn-danger',
+                                            action: function () {
+                                                e.close();
+
+                                                showAjaxLoading();
+                                                apigClient.typePost({ action: 'deleteBeacon', type: 'Beacon' }, { Beacon: { BeaconID: clickUpdateBeaconId } }, additionalParams)
+                                                    .then(function (result) {
+                                                        reloadTable();
+                                                        showSuccessMsg();
+                                                    }).catch(function (error) {
+                                                        showErrorMsg(error);
+                                                    });
+                                                hideAjaxLoading();
+                                            }
+                                        }
+                                    }
+                                });
+                                return false;
+                            }
+                        },
+                        save: {
+                            text: 'Save',
+                            btnClass: 'btn btn-success',
+                            action: function () {
+                                //remove the beacon id that is going to be updated from the array list
+                                indexOfUpdatedBeaconID = beaconIDs.indexOf(parseInt($('#inputBeaconID').val()));
+                                beaconIDs.splice(indexOfUpdatedBeaconID, 1);
+
+                                if (!$('#beaconForm')[0].checkValidity()) {
+                                    $('<input type="submit">').hide().appendTo($('#beaconForm')).click().remove();
+                                    return false;
+                                }
+                                else if (beaconIDs.indexOf(clickUpdateBeaconId) > -1) {
+                                    alert('You cannot have a duplicated beacon ID!')
+                                    return false;
+                                }
+                                else {
+                                    showAjaxLoading();
+                                    var updateBeaconID = parseInt($('#inputBeaconID').val());
+                                    var updateBeaconUUID = $('.inputBeaconUUID:eq(0)').val() + '-' + $('.inputBeaconUUID:eq(1)').val() + '-' + $('.inputBeaconUUID:eq(2)').val() + '-' + $('.inputBeaconUUID:eq(3)').val() + '-' + $('.inputBeaconUUID:eq(4)').val()
+                                    var updateBeaconMajor = parseInt($('#inputBeaconMajor').val());
+                                    var updateBeaconMinor = parseInt($('#inputBeaconMinor').val());
+                                    var updateTurningPoint;
+                                    if ($('#inputTurningPt').prop('checked'))
+                                        updateTurningPoint = 1;
+                                    else
+                                        updateTurningPoint = 0;
+
+                                    apigClient.typePost({ action: 'putBeacon', type: 'Beacon' }, { Beacon: { BeaconID: updateBeaconID, UUID: updateBeaconUUID, Major: updateBeaconMajor, Minor: updateBeaconMinor, TurningPoint: updateTurningPoint } }, additionalParams)
+                                        .then(function (result) {
+                                            reloadTable();
+                                            showSuccessMsg();
+                                        }).catch(function (error) {
+                                            showErrorMsg(error);
+                                        });
+                                    hideAjaxLoading();
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+    });
+
+    $('#addButton').on('click', function () {
+        $.confirm({
+            animateFromElement: false,
+            animation: 'top',
+            columnClass: 'col-md-6 col-md-offset-3',
+            title: 'Add Beacon',
+            content: contentHTML,
+            buttons: {
+                cancel: {
+                    text: 'Cancel',
+                    btnClass: 'btn btn-link',
+                },
+                add: {
+                    text: 'Add',
+                    btnClass: 'btn btn-success',
+                    action: function () {
+                        if (!$('#beaconForm')[0].checkValidity()) {
+                            $('<input type="submit">').hide().appendTo($('#beaconForm')).click().remove();
+                            return false;
+                        }
+                        else if (beaconIDs.indexOf(parseInt($('#inputBeaconID').val())) > -1) {
+                            alert('You cannot have a duplicated beacon ID!')
+                            return false;
+                        }
+                        else {
+                            showAjaxLoading();
+                            var createBeaconID = parseInt($('#inputBeaconID').val());
+                            var createBeaconUUID = $('.inputBeaconUUID:eq(0)').val() + '-' + $('.inputBeaconUUID:eq(1)').val() + '-' + $('.inputBeaconUUID:eq(2)').val() + '-' + $('.inputBeaconUUID:eq(3)').val() + '-' + $('.inputBeaconUUID:eq(4)').val()
+                            var createBeaconMajor = parseInt($('#inputBeaconMajor').val());
+                            var createBeaconMinor = parseInt($('#inputBeaconMinor').val());
+                            var createTurningPoint;
+                            if ($('#inputTurningPt').prop('checked'))
+                                createTurningPoint = 1;
+                            else
+                                createTurningPoint = 0;
+
+                            apigClient.typePost({ action: 'createBeacon', type: 'Beacon' }, { Beacon: { BeaconID: createBeaconID, UUID: createBeaconUUID, Major: createBeaconMajor, Minor: createBeaconMinor, TurningPoint: createTurningPoint, Toggle: 1 } }, additionalParams)
+                                .then(function (result) {
+                                    reloadTable();
+                                    showSuccessMsg();
+                                }).catch(function (error) {
+                                    showErrorMsg(error);
+                                });
+                            hideAjaxLoading();
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    async function reloadTable() {
+        var currentPage = $('#beaconTable').dataTable().api().page.info().page;
+        var newData = await getBeaconData();
+        $('#beaconTable').dataTable().api().clear().rows.add(newData).draw();
+        $('#beaconTable').dataTable().api().page(currentPage).draw('page');
+    }
+
+    function getBeaconIDs() {
+        return new Promise(resolve => {
+            apigClient.typePost({ action: 'getBeacon', type: 'Beacon' }, body, additionalParams)
+                .then(function (result) {
+                    var beaconIDs = [];
+                    for (index = 0; index < result.data.length; index++) {
+                        beaconIDs.push(result.data[index].BeaconID);
+                    }
+                    resolve(beaconIDs);
+                }).catch(function (error) {
+                    showErrorMsg(error);
+                    console.log('Unexpected Error ' + error);
+                });
+        })
+    }
+</script>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<%- include partials/head.ejs %>
+	<%- include partials/aws.ejs %>
+
+		<body>
+			<div id="wrapper">
+				<%- include partials/header.ejs %>
+					<div id="page-wrapper">
+						<div class="container-fluid">
+							<div class="row">
+								<div class="col-lg-12">
+									<h1 class="page-header">Facilities</h1>
+									<a class="btn btn-primary addBtn" id="addButton">Add</a>
+								</div>
+								<div id="cardsContainer"></div>
+							</div>
+						</div>
+					</div>
+			</div>
+		</body>
+
+</html>
+
+<script>
+	var apigClient = apigClientFactory.newClient();
+	var contentHTML = '<form id="facilityForm" method="POST" enctype="multipart/form-data" action="/facilities"><img class="previewImg" id="outputImage" src="../images/noimage.jpg"/><input id="inputImage" name="inputImage" type="file" accept="image/*"><h4>Facility Name</h4><input id="inputName" type="text" size="38" required><h4>Description</h4><textarea id="inputDesc" cols="40" rows="3"></textarea><h4>Units</h4><select id="inputUnits" multiple="multiple"></form>';
+
+	loadFacilities();
+
+	async function loadFacilities() {
+		showAjaxLoading();
+		facilitiesData = await getFacilitiesData();
+		$container = $('#cardsContainer').empty();
+
+		for (index = 0; index < facilitiesData.length; index++) {
+			facility = facilitiesData[index];
+			facilityID = facility.FacilityID;
+			facilityName = facility.FacilityName;
+			facilityInfo = facility.FacilityInfo;
+			facilityImageURL = facility.ImageURL;
+			$card = $('<div></div>').addClass('card cardPositioning');
+
+			//append img to card
+			$img = $('<img>').attr('src', facilityImageURL).addClass('cardImage');
+			$card.append($img);
+
+			//append div to card
+			$cardTitling = $('<div></div>').addClass('container cardTitling');
+			$title = $('<h4></h4>').addClass('facilityTitle').text(facilityName);
+			$button = $('<button></button>').addClass('btn editBtn text-primary updateButton').attr('data-id', facilityID).html('<span class="glyphicon glyphicon-edit"></span> Edit');
+			$cardTitling.append($title);
+			$cardTitling.append($button);
+			$card.append($cardTitling);
+
+			$container.append($card);
+		}
+
+		//If there's no image
+		$('.cardImage').on('error', function (e) {
+			$(this).attr('src', '../images/noimage.jpg');
+		});
+
+		$('.updateButton').on('click', function () {
+			var clickUpdateFacID = $(this).data('id');
+			showAjaxLoading();
+			var clickedFacData, imageID;
+
+			$.confirm({
+				columnClass: 'col-md-6 col-md-offset-3',
+				title: 'Update Facility',
+				content: contentHTML,
+				onContentReady: async function () {
+					$('#inputImage').on('change', function () {
+						var reader = new FileReader();
+
+						reader.onload = function (e) {
+							$('#outputImage').attr('src', e.target.result);
+						}
+						reader.readAsDataURL(this.files[0])
+					});
+
+					unitsData = await getUnitsData();
+					for (index = 0; index < unitsData.length; index++) {
+						$('#inputUnits').append('<option value="' + unitsData[index].UnitID + '">' + unitsData[index].UnitNo + '</option>');
+					}
+
+					//get the facilities information like name, desc, image
+					apigClient.typePost({ action: 'getFacilityById', type: 'Facility' }, { Facility: { FacilityID: clickUpdateFacID } }, additionalParams)
+						.then(function (result) {
+							clickedFacData = result.data[0];
+							imageID = clickedFacData.ImageID;
+
+							$('#inputName').val(clickedFacData.FacilityName);
+							$('#inputDesc').val(clickedFacData.FacilityInfo);
+							$('#outputImage').attr('src', clickedFacData.ImageURL);
+						});
+
+					//get the units that associated with this facility, them place them inside the select2 plugin
+					apigClient.typePost({ action: 'getFacilityUnitById', type: 'FacilityUnit' }, { FacilityUnit: { FacilityID: clickUpdateFacID } }, additionalParams)
+						.then(function (result) {
+							relatedUnits = [];
+							for (index = 0; index < result.data.length; index++) {
+								relatedUnits.push(result.data[index].UnitID);
+							}
+							$('#inputUnits').val(relatedUnits);
+
+							//select2 plugin
+							$('#inputUnits').select2({
+								dropdownParent: $('.jconfirm-cell'),
+								theme: 'bootstrap'
+							});
+
+						}).catch(function (error) {
+							showErrorMsg(error);
+							console.log('Unexpected Error ' + error);
+						});
+					hideAjaxLoading();
+				},
+				buttons: {
+					cancel: {
+						text: 'Cancel',
+						btnClass: 'btn btn-link'
+					},
+					delete: {
+						text: 'Delete',
+						btnClass: 'btn btn-danger',
+						action: function () {
+							e = this;
+							$.confirm({
+								columnClass: 'col-md-4 col-md-offset-4',
+								title: 'Delete Confirmation',
+								content: 'Are you sure you want to delete the facility? This cannot be undone.',
+								buttons: {
+									cancel: {
+										text: 'Cancel',
+										btnClass: 'btn btn-link',
+									},
+									delete: {
+										text: 'Delete',
+										btnClass: 'btn btn-danger',
+										action: function () {
+											e.close();
+
+											showAjaxLoading();
+											apigClient.typePost({ action: 'deleteFacility', type: 'Facility' }, { Facility: { FacilityID: clickUpdateFacID } }, additionalParams)
+												.then(function (result) {
+													loadFacilities();
+													showSuccessMsg();
+												}).catch(function (error) {
+													showErrorMsg(error);
+												});
+											hideAjaxLoading();
+										}
+									}
+								}
+							});
+							return false;
+						}
+					},
+					save: {
+						text: 'Save',
+						btnClass: 'btn btn-success',
+						action: function () {
+							if (!$('#facilityForm')[0].checkValidity()) {
+								$('<input type="submit">').hide().appendTo($('#facilityForm')).click().remove();
+								return false;
+							}
+							else {
+								showAjaxLoading();
+								var updateName = $('#inputName').val();
+								var updateDesc = $('#inputDesc').val();
+								var updateUnits = $('#inputUnits').val();
+								var updateURL;
+								if ($('#inputImage').val() != "") {
+									//Plugin, use ajaxsubmit so they will not redirect
+									$('#facilityForm').ajaxSubmit({
+										url: '/facilitiesImage', type: 'POST', async: false, success: function (data) {
+											updateURL = data;
+										}
+									});
+								}
+								else {
+									updateURL = clickedFacData.ImageURL;
+								}
+
+								apigClient.typePost({ action: 'putFacility', type: 'Facility' }, { Facility: { FacilityID: clickUpdateFacID, FacilityName: updateName, FacilityInfo: updateDesc, ImageID: imageID, ImageURL: updateURL, Category: 'Facility', UnitID: updateUnits } }, additionalParams)
+									.then(async function (result) {
+										await sleep(1000);
+										loadFacilities();
+										showSuccessMsg();
+									}).catch(function (error) {
+										console.log(error);
+										showErrorMsg(error);
+									});
+								hideAjaxLoading();
+							}
+						}
+					}
+				}
+			});
+		});
+		hideAjaxLoading();
+	}
+
+	function getFacilitiesData() {
+		return new Promise(resolve => {
+			apigClient.typePost({ action: 'getFacility', type: 'Facility' }, body, additionalParams)
+				.then(function (result) {
+					resolve(result.data);
+				}).catch(function (error) {
+					showErrorMsg(error);
+					console.log('Unexpected Error ' + error);
+				});
+		});
+	}
+
+	$('#addButton').on('click', function () {
+		createURL = "";
+		$.confirm({
+			columnClass: 'col-md-6 col-md-offset-3',
+			title: 'Add Facility',
+			content: contentHTML,
+			onContentReady: async function () {
+				$('#inputImage').on('change', function () {
+					var reader = new FileReader();
+
+					reader.onload = function (e) {
+						$('#outputImage').attr('src', e.target.result);
+					}
+
+					reader.readAsDataURL(this.files[0]);
+					hideAjaxLoading();
+				});
+
+				unitsData = await getUnitsData();
+				for (index = 0; index < unitsData.length; index++) {
+					$('#inputUnits').append('<option value="' + unitsData[index].UnitID + '">' + unitsData[index].UnitNo + '</option>');
+				}
+
+				//select2 plugin
+				$('#inputUnits').select2({
+					dropdownParent: $('.jconfirm-cell'),
+					theme: 'bootstrap'
+				});
+			},
+			buttons: {
+				cancel: {
+					text: 'Cancel',
+					btnClass: 'btn btn-link',
+				},
+				add: {
+					text: 'Add',
+					btnClass: 'btn btn-success',
+					action: function () {
+						if (!$('#facilityForm')[0].checkValidity()) {
+							$('<input type="submit">').hide().appendTo($('#facilityForm')).click().remove();
+							return false;
+						}
+						else {
+							showAjaxLoading();
+							//Plugin, use ajaxsubmit so they will not redirect
+							$('#facilityForm').ajaxSubmit({
+								url: '/facilitiesImage', type: 'POST', async: false, success: function (data) {
+									createURL = data;
+								}
+							});
+							var createName = $('#inputName').val();
+							var createDesc = $('#inputDesc').val();
+							var createUnits = $('#inputUnits').val();
+
+							apigClient.typePost({ action: 'createFacility', type: 'Facility' }, { Facility: { FacilityName: createName, FacilityInfo: createDesc, ImageURL: createURL, Category: 'Facility', UnitID: createUnits } }, additionalParams)
+								.then(async function (result) {
+									await sleep(1000);
+									loadFacilities();
+									showSuccessMsg();
+								}).catch(function (error) {
+									showErrorMsg(error);
+								});
+							hideAjaxLoading();
+						}
+					}
+				}
+			}
+		});
+	});
+
+	function getUnitsData() {
+		return new Promise(resolve => {
+			apigClient.typePost({ action: 'getUnit', type: 'Unit' }, body, additionalParams)
+				.then(function (result) {
+					var unitsData = [];
+					for (index = 0; index < result.data.length; index++) {
+						unitsData.push({ UnitID: result.data[index].UnitID, UnitNo: result.data[index].UnitNo });
+					}
+					resolve(unitsData);
+				}).catch(function (error) {
+					showErrorMsg(error);
+					console.log('Unexpected Error ' + error);
+				});
+		});
+	}
+
+	function sleep(ms) {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+</script>

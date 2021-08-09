@@ -1,0 +1,389 @@
+/* Navigation */
+.navbar-default{
+	background-color: #f3f3f3;
+	border-color: #e7e7e7;
+}
+
+nav.navbar.navbar-default.navbar-static-top{
+	padding-bottom: 10px;
+}
+
+div.navbar-default.sidebar{
+	margin-top: 61px;
+}
+
+/* Table */
+tr th{
+	text-align: center;
+	font-size: 18px;
+}
+
+tr td{
+	text-align: center;
+	font-size: 16px;
+}
+
+/* Button */
+.addBtn{
+	float: right;
+    padding: 6px 25px;
+    margin-bottom: 10px;
+}
+
+/* Alert */
+#showBadAlert, #showGoodAlert{
+    display: none;
+}
+
+
+/* Toggle Switch */
+/* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {display:none;}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+
+/* Card */
+.card {
+    /* Add shadows to create the "card" effect */
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    transition: 0.3s;
+}
+
+/* On mouse-over, add a deeper shadow */
+.card:hover {
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+}
+
+/* Add some padding inside the card container */
+#cardsContainer {
+    padding: 2px 16px;
+}
+
+div.card{
+	margin-top: 40px;
+	width: 22%;
+}
+
+.card img{
+	padding: 5px;
+}
+
+div.card.cardPositioning img{
+    width: 100%;
+    height: 140px;
+}
+
+.cardTitling{
+    position: relative;
+	background-color: #f3f3f3;
+	padding: 12px 15px;
+	width: 100%;
+}
+
+.cardPositioning{
+	display: inline-block;
+	margin-right: 20px;
+	margin-bottom: 30px;
+}
+
+.unitTitle{
+    font-weight: bold;
+    font-size:1vw;
+    line-height: 20px;
+    overflow: hidden;
+}
+
+.facilityTitle{
+	font-weight: bold;
+    font-size:1vw;
+    height: 50px;
+    line-height: 20px;
+    overflow: hidden;
+	
+}
+
+
+.editBtn{
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background-color:transparent;
+}
+
+/* Login */
+div.container.loginContainer {
+	padding-top: 200px;
+}
+
+.panel-heading{
+	text-align: center;
+}
+
+.panel-title{
+	font-size: 22px;
+}
+
+.panel {
+    padding: 0;
+}
+
+.loginLogo{
+	width: 100%;
+	height: auto;
+	margin-bottom: 20px;
+}
+
+
+body, html {
+    height: 100%;
+    margin: 0;
+}
+
+.background {
+    /* The image used */
+    background-image: url("../images/loginBG.png");
+    height: 100%; 
+
+    /* Center and scale the image nicely */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+
+
+/* MODAL FOR ADD AND UPDATE FORM */
+.modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Stay in place */
+    z-index: 1; /* Sit on top */
+    padding-top: 100px; /* Location of the box */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content */
+.modal-content {
+    position: relative;
+    background-color: #fefefe;
+    margin: auto;
+    padding: 5px 10px;
+    border: 1px solid #888;
+	border-radius: 20px;
+    width: 35%;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: 0.4s;
+    animation-name: animatetop;
+    animation-duration: 0.4s
+}
+
+/* Add Animation */
+@-webkit-keyframes animatetop {
+    from {top:-300px; opacity:0} 
+    to {top:0; opacity:1}
+}
+
+@keyframes animatetop {
+    from {top:-300px; opacity:0}
+    to {top:0; opacity:1}
+}
+
+.modal-header {
+	border: 1px;
+	border-radius: 15px 15px 0px 0px;
+    padding: 2px 16px;
+    background-color: #fefefe;
+    color: black;
+}
+
+.modal-body {
+	padding: 2px 16px;
+}
+
+.modal-footer {
+    padding: 2px 16px 25px 2px;
+	border: 0px;
+	border-radius: 0px 0px 15px 15px;
+    background-color: #fefefe;
+    color: white;
+}
+
+/* MODAL CONTENT */
+div.modal-header h2{
+	margin-top: 30px;
+}
+
+.inputShortWidth{
+	width: 10%
+}
+
+form h4{
+	margin-top: 30px;
+}
+
+h5 {
+    display:inline-block;
+}
+
+.saveBtn{
+	padding: 6px 25px;
+	margin-bottom: 10px;
+}
+
+.browseBtn{
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+
+.previewImg{
+    display: block;
+    max-width: 400px;
+    max-height: 200px;
+    margin-bottom: 20px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+textarea {
+    resize: none;
+}
+
+.dirBox, .unitBox, .majMinBox {
+    display: inline-block;
+    margin-right:20px;
+}
+
+
+select {
+    height:28px;
+}
+
+/* DataTables Plugin */
+div.dataTables_length{
+	margin-bottom: 15px;
+}
+
+
+/* DataTables Plugin Pagination */
+div.dataTables_paginate.paging_simple_numbers{
+	margin-bottom: 30px;
+}
+
+/* Image Picker Plugin */
+.thumbnails.image_picker_selector .thumbnail img {
+    width: 150px;
+    height: 100px!important;
+  }
+
+#inputRelRelatedBeacons, #inputUnits, #inputBeacons {
+    width:70%;
+}
+
+/*Ajax loading screen*/
+#ajaxLoading
+{
+    display:none;
+    background: url("../images/ajax-loader.gif") no-repeat center center rgba(255, 255, 255, 0.5);
+    position: fixed;
+    height: 100%;
+    width: 100%;
+    z-index: 999999999;  
+}
+
+/*bootstrap-datepicker*/
+#inputDateStart, #inputDateEnd {
+    text-align:center;
+}
+
+/*dashboard bar chart*/
+#barchart {
+    margin-top: 34px;
+}
+
+/*dashboard more info*/
+#routeInfo1 {
+    border-collapse: separate;
+    border-spacing: 60px 20px;
+    margin-left: -60px;
+    /* remove outer border spacing */
+    margin-right: -60px;
+    /* remove outer border spacing */
+  }
+  
+#routeInfo2 {
+    border-collapse: separate;
+    border-spacing: 20px 10px;
+    margin-left: -20px;
+    /* remove outer border spacing */
+    margin-right: -20px;
+    /* remove outer border spacing */
+}
+  
+#routeInfo1 td:nth-child(2n-1), #routeInfo2 td:nth-child(2n-1) {
+    font-weight: bold;
+}
+
+#routeInfo1 tr th, #routeInfo2 tr th{
+	text-align: left;
+}
+
+#routeInfo1 tr td, #routeInfo2 tr td{
+	text-align: left;
+}
+
+/* jquery-plugin */
+.jconfirm-content {
+    overflow-x: hidden!important;
+}

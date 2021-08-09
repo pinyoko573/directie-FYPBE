@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<%- include partials/head.ejs %>
+	<%- include partials/aws.ejs %>
+
+		<body>
+			<div id="wrapper">
+				<%- include partials/header.ejs %>
+					<div id="page-wrapper">
+						<div class="container-fluid">
+							<div class="row">
+								<div class="col-lg-12">
+									<h1 class="page-header">Units</h1>
+									<span>
+										Search Unit
+										<input type="text" id="inputUnit">
+										<a class="btn btn-primary addBtn" id="addButton">Add</a>
+									</span>
+								</div>
+								<div id="cardsContainer"></div>
+							</div>
+						</div>
+					</div>
+			</div>
+		</body>
+
+</html>
+
+<script>
+	var apigClient = apigClientFactory.newClient();
+	var contentHTML = '<form id="unitForm" method="POST" enctype="multipart/form-data" action="/facilities"><img class="previewImg" id="outputImage" src="../images/noimage.jpg"><input id="inputImage" name="inputImage" type="file" accept="image/*"><div>Alternatively, you can use the same image <a href="javascript:void(0)" onclick="getImages()">here.</a></div><span class="dirBox" style="width:100%"><h4>Unit Name</h4><input id="inputName" type="text" size="40" required></span><span class="dirBox"><h4>Block</h4><input id="inputBlock" type="text" required></span><span class="dirBox"><h4>Level</h4><select id="inputLevel" required><option value="">-</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></span><span class="dirBox"><h4>Unit Number</h4><input id="inputNumber" type="text" required></span><h4>Associated Beacons</h4><select id="inputBeacons" multiple="multiple"></form>';
+	hasUsedUnitImage = false;
+	var usedImageId;
+	loadUnits();
+
+	async function loadUnits() {
+		showAjaxLoading();
+		unitsData = await getUnitsData();
+		$container = $('#cardsContainer').empty();
+
+		for (index = 0; index < unitsData.length; index++) {
+			unit = unitsData[index];
+			unitID = unit.UnitID;
+			unitNo = unit.UnitNo;
+			unitName = unit.UnitName;
+			unitLevel = unit.Level;
+			unitBlock = unit.Block;
+			unitImageURL = unit.ImageURL;
+			$card = $('<div></div>').addClass('card cardPositioning').attr('data-unitno', unitNo);
+
+			//append img to card
+			$img = $('<img>').attr('src', unitImageURL).addClass('cardImage');
+			$card.append($img);
+
+			//append div to card	
+			$cardTitling = $('<div></div>').addClass('container cardTitling');
+			$title = $('<h4></h4>').addClass('unitTitle').text(unitNo);
+			$subtitle = $('<h4></h4>').addClass('unitTitle').text(unitName);
+
+			$caption = $('<h5></h5>').text('Block ' + unitBlock + ' Level ' + unitLevel);
+			$button = $('<button></button>').addClass('btn editBtn text-primary updateButton').attr('data-id', unitID).html('<span class="glyphicon glyphicon-edit"></span> Edit');
+
+			$cardTitling.append($title);
+			$cardTitling.append($subtitle);
+			$cardTitling.append('<br>');
+			$cardTitling.append($caption);
+			$cardTitling.append($button);
+			$card.append($cardTitling);
+
+			$container.append($card);
+		}
+
+		//If there's no image
+		$('.cardImage').on('error', function (e) {
+			$(this).attr('src', '../images/noimage.jpg');
+		});
+
+		$('.updateButton').on('click', function () {
+			var clickUpdateUnitID = $(this).data('id');
+			showAjaxLoading();
+			var clickedUnitData, imageID;
+
+			$.confirm({
+				columnClass: 'col-md-6 col-md-offset-3',
+				title: 'Update Unit',
+				content: contentHTML,
+				onContentReady: async function () {
+					beaconsData = await getBeaconIDs();
+					for (index = 0; index < beaconsData.length; index++) {
+						$('#inputBeacons').append('<option value="' + beaconsData[index] + '">' + beaconsData[index] + '</option>');
+					}
+
+					$('#inputImage').on('change', function () {
+						var reader = new FileReader();
+
+						reader.onload = function (e) {
+							$('#outputImage').attr('src', e.target.result);
+						}
+						reader.readAsDataURL(this.files[0])
+
+						//If the user chose an image from his computer, AND not from the same image, set to false
+						hasUsedUnitImage = false;
+					});
+
+					//get the units information like name, block, level, no, imageurl
+					apigClient.typePost({ action: 'getUnitById', type: 'Unit' }, { Unit: { UnitID: clickUpdateUnitID } }, additionalParams)
+						.then(function (result) {
+							clickedUnitData = result.data[0];
+							imageID = clickedUnitData.ImageID;
+
+							$('#inputName').val(clickedUnitData.UnitName);
+							$('#inputBlock').val(clickedUnitData.Block);
+							$('#inputLevel').val(clickedUnitData.Level);
+							$('#inputNumber').val(clickedUnitData.UnitNo);
+							$('#outputImage').attr('src', clickedUnitData.ImageURL);
+						});
+
+					//get the units that associated with this facility, them place them inside the select2 plugin
+					apigClient.typePost({ action: 'getBeaconUnitById', type: 'BeaconUnit' }, { BeaconUnit: { UnitID: clickUpdateUnitID } }, additionalParams)
+						.then(function (result) {
+							relatedBeacons = [];
+							for (index = 0; index < result.data.length; index++) {
+								relatedBeacons.push(result.data[index].BeaconID);
+							}
+							$('#inputBeacons').val(relatedBeacons);
+
+							//select2 plugin
+							$('#inputBeacons').select2({
+								dropdownParent: $('.jconfirm-cell'),
+								theme: 'bootstrap'
+							});
+						}).catch(function (error) {
+							showErrorMsg(error);
+							console.log('Unexpected Error ' + error);
+						});
+					hideAjaxLoading();
+				},
+				buttons: {
+					cancel: {
+						text: 'Cancel',
+						btnClass: 'btn btn-link'
+					},
+					delete: {
+						text: 'Delete',
+						btnClass: 'btn btn-danger',
+						action: function () {
+							e = this;
+							$.confirm({
+								columnClass: 'col-md-4 col-md-offset-4',
+								title: 'Delete Confirmation',
+								content: 'Are you sure you want to delete the Unit? This cannot be undone.',
+								buttons: {
+									cancel: {
+										text: 'Cancel',
+										btnClass: 'btn btn-link',
+									},
+									delete: {
+										text: 'Delete',
+										btnClass: 'btn btn-danger',
+										action: function () {
+											e.close();
+
+											showAjaxLoading();
+											apigClient.typePost({ action: 'deleteUnit', type: 'Unit' }, { Unit: { UnitID: clickUpdateUnitID } }, additionalParams)
+												.then(function (result) {
+													loadUnits();
+													showSuccessMsg();
+												}).catch(function (error) {
+													showErrorMsg(error);
+												});
+											hideAjaxLoading();
+										}
+									}
+								}
+							});
+							return false;
+						}
+					},
+					save: {
+						text: 'Save',
+						btnClass: 'btn btn-success',
+						action: function () {
+							if (!$('#unitForm')[0].checkValidity()) {
+								$('<input type="submit">').hide().appendTo($('#unitForm')).click().remove();
+								return false;
+							}
+							else {
+								showAjaxLoading();
+								var updateName = $('#inputName').val();
+								var updateBlock = $('#inputBlock').val();
+								var updateLevel = parseInt($('#inputLevel').val());
+								var updateNumber = $('#inputNumber').val();
+								var updateBeacons = $('#inputBeacons').val();
+								var updateURL;
+								// if user used the images that already exist
+								if (hasUsedUnitImage) {
+									updateURL = usedImageId;
+								}
+								else {
+									//if user changed to a new image from his computer
+									if ($('#inputImage').val() != "") {
+										//Plugin, use ajaxsubmit so they will not redirect
+										$('#unitForm').ajaxSubmit({
+											url: '/unitsImage', type: 'POST', async: false, success: function (data) {
+												updateURL = data;
+											}
+										});
+									}
+									else {
+										//if user did not change any image
+										updateURL = clickedUnitData.ImageURL;
+									}
+								}
+
+								apigClient.typePost({ action: 'putUnit', type: 'Unit' }, { Unit: { UnitID: clickUpdateUnitID, UnitName: updateName, Block: updateBlock, Level: updateLevel, UnitNo: updateNumber, ImageID: imageID, ImageURL: updateURL, BeaconID: updateBeacons, Category: 'Unit' } }, additionalParams)
+									.then(async function (result) {
+										await sleep(1000);
+										loadUnits();
+										showSuccessMsg();
+									}).catch(function (error) {
+										console.log(error);
+										showErrorMsg(error);
+									});
+								hideAjaxLoading();
+							}
+						}
+					}
+				}
+			});
+		});
+		hideAjaxLoading();
+	}
+
+	var apigClient = apigClientFactory.newClient();
+	function getUnitsData() {
+		return new Promise(resolve => {
+			apigClient.typePost({ action: 'getUnit', type: 'Unit' }, body, additionalParams)
+				.then(function (result) {
+					resolve(result.data);
+				}).catch(function (error) {
+					showErrorMsg(error);
+					console.log('Unexpected Error ' + error);
+				});
+		});
+	}
+
+	$('#addButton').on('click', function () {
+		showAjaxLoading();
+		$.confirm({
+			columnClass: 'col-md-6 col-md-offset-3',
+			title: 'Add Unit',
+			content: contentHTML,
+			onContentReady: async function () {
+				$('#inputImage').on('change', function () {
+					var reader = new FileReader();
+					reader.onload = function (e) {
+						$('#outputImage').attr('src', e.target.result);
+					}
+					reader.readAsDataURL(this.files[0])
+					//If the user chose an image from his computer, AND not from the same image, set to false
+					hasUsedUnitImage = false;
+				});
+
+				beaconsData = await getBeaconIDs();
+				for (index = 0; index < beaconsData.length; index++) {
+					$('#inputBeacons').append('<option value="' + beaconsData[index] + '">' + beaconsData[index] + '</option>');
+				}
+
+				//select2 plugin
+				$('#inputBeacons').select2({
+					dropdownParent: $('.jconfirm-cell'),
+					theme: 'bootstrap'
+				});
+				hideAjaxLoading();
+			},
+			buttons: {
+				cancel: {
+					text: 'Cancel',
+					btnClass: 'btn btn-link',
+				},
+				add: {
+					text: 'Add',
+					btnClass: 'btn btn-success',
+					action: function () {
+						if (!$('#unitForm')[0].checkValidity()) {
+							$('<input type="submit">').hide().appendTo($('#unitForm')).click().remove();
+							return false;
+						}
+						else {
+							showAjaxLoading();
+							var createName = $('#inputName').val();
+							var createBlock = $('#inputBlock').val();
+							var createLevel = parseInt($('#inputLevel').val());
+							var createNumber = $('#inputNumber').val();
+							var createURL;
+							//Plugin, use ajaxsubmit so they will not redirect
+							if (hasUsedUnitImage) {
+								createURL = usedImageId;
+							}
+							else {
+								if ($('#inputImage').val() == "") {
+									createURL = 55;
+								}
+								else {
+									$('#unitForm').ajaxSubmit({
+										url: '/unitsImage', type: 'POST', async: false, success: function (data) {
+											createURL = data;
+										}
+									});
+								}
+							}
+
+							apigClient.typePost({ action: 'createUnit', type: 'Unit' }, { Unit: { UnitName: createName, Block: createBlock, Level: createLevel, UnitNo: createNumber, ImageURL: createURL, Category: 'Unit' } }, additionalParams)
+								.then(async function (result) {
+									await sleep(1000);
+									loadUnits();
+									showSuccessMsg();
+								}).catch(function (error) {
+									showErrorMsg(error);
+								});
+							hideAjaxLoading();
+						}
+					}
+				}
+			}
+		});
+	});
+
+	function getBeaconIDs() {
+		return new Promise(resolve => {
+			apigClient.typePost({ action: 'getBeacon', type: 'Beacon' }, body, additionalParams)
+				.then(function (result) {
+					var beaconIDs = [];
+					for (index = 0; index < result.data.length; index++) {
+						beaconIDs.push(result.data[index].BeaconID);
+					}
+					resolve(beaconIDs);
+				}).catch(function (error) {
+					showErrorMsg(error);
+					console.log('Unexpected Error ' + error);
+				});
+		})
+	}
+
+	function getImages() {
+		$.confirm({
+			columnClass: 'col-xs-10 col-xs-offset-1',
+			title: 'Images',
+			content: '<select id="imagesSelect"></select>',
+			onContentReady: function () {
+				apigClient.typePost({ action: 'getImage', type: 'Image' }, body, additionalParams)
+					.then(function (result) {
+						for (index = 0; index < result.data.length; index++) {
+							$('#imagesSelect').append('<option data-img-src="' + result.data[index].ImageURL + '" value="' + result.data[index].ImageID + '"></option>');
+						}
+
+						$('#imagesSelect').imagepicker();
+					}).catch(function (error) {
+						showErrorMsg(error);
+						console.log('Unexpected Error ' + error);
+					});
+			},
+			buttons: {
+				cancel: {
+					text: 'Cancel',
+					btnClass: 'btn btn-link'
+				},
+				add: {
+					text: 'Add',
+					btnClass: 'btn btn-success',
+					action: function () {
+						hasUsedUnitImage = true;
+						$('#outputImage').attr('src', $('#imagesSelect option:selected').data('img-src'));
+						usedImageId = $('#imagesSelect').val();
+					}
+				}
+			}
+		});
+	}
+
+	$('#inputUnit').on('input', function () {
+		if ($('#inputUnit').val() == "") {
+			$('.card').show();
+		}
+		else {
+			$('.card').hide();
+			noOfUnits = $('.card').length;
+			for (index = 0; index < noOfUnits; index++) {
+				if ($('.card:eq(' + index + ')').data('unitno').indexOf($('#inputUnit').val()) > -1) {
+					$('.card:eq(' + index + ')').show();
+				}
+			}
+		}
+	});
+
+	function sleep(ms) {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+</script>
